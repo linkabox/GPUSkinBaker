@@ -219,7 +219,7 @@ public class GPUSkinBaker : EditorWindow
         animData.clips = new GPUSkinClipData[allClips.Length];
         var skinRender = go.GetComponentInChildren<SkinnedMeshRenderer>();
         //所有资源名以蒙皮网格为前缀
-        string prefabName = skinRender.sharedMesh.name;
+        string meshName = skinRender.sharedMesh.name;
 
         var vCount = skinRender.sharedMesh.vertexCount;
         var atlasWidth = vCount;//Mathf.NextPowerOfTwo(vCount);
@@ -274,9 +274,9 @@ public class GPUSkinBaker : EditorWindow
             var infoList = new List<VertInfo>();
 
             var pRt = new RenderTexture(atlasWidth, texHeight, 0, RenderTextureFormat.ARGBHalf);
-            pRt.name = string.Format("{0}.{1}.posTex", prefabName, clip.name);
+            pRt.name = string.Format("{0}.{1}.posTex", meshName, clip.name);
             var nRt = new RenderTexture(atlasWidth, texHeight, 0, RenderTextureFormat.ARGBHalf);
-            nRt.name = string.Format("{0}.{1}.normTex", prefabName, clip.name);
+            nRt.name = string.Format("{0}.{1}.normTex", meshName, clip.name);
             foreach (var rt in new[] { pRt, nRt })
             {
                 rt.enableRandomWrite = true;
@@ -415,11 +415,11 @@ public class GPUSkinBaker : EditorWindow
         animData.material = mat;
         animData.mesh = skinRender.sharedMesh;
 
-        AssetDatabase.CreateAsset(atlasPosTex, Path.Combine(outputFolder, prefabName + "_pos.asset"));
-        AssetDatabase.CreateAsset(atlasNormalTex, Path.Combine(outputFolder, prefabName + "_n.asset"));
-        AssetDatabase.CreateAsset(animData, Path.Combine(outputFolder, prefabName + "_animData.asset"));
+        AssetDatabase.CreateAsset(atlasPosTex, Path.Combine(outputFolder, meshName + "_pos.asset"));
+        AssetDatabase.CreateAsset(atlasNormalTex, Path.Combine(outputFolder, meshName + "_n.asset"));
+        AssetDatabase.CreateAsset(animData, Path.Combine(outputFolder, meshName + "_animData.asset"));
 
-        var newAnimatorController = GenGPUSkinOverrideController(Path.Combine(outputFolder, prefabName + "_gskin.overrideController"), baseController, overrideClips);
+        var newAnimatorController = GenGPUSkinOverrideController(Path.Combine(outputFolder, go.name + "_gskin.overrideController"), baseController, overrideClips);
 
         var tempGo = new GameObject(go.name + "_gskin");
         tempGo.AddComponent<Animator>().runtimeAnimatorController = newAnimatorController;
@@ -436,7 +436,7 @@ public class GPUSkinBaker : EditorWindow
             }
         }
 
-        AssetDatabase.CreateAsset(mat, Path.Combine(outputFolder, string.Format("{0}_gskin.mat", prefabName)));
+        AssetDatabase.CreateAsset(mat, Path.Combine(outputFolder, string.Format("{0}_gskin.mat", meshName)));
         PrefabUtility.CreatePrefab(Path.Combine(RawPrefabsPath, tempGo.name + ".prefab").Replace("\\", "/"), tempGo, ReplacePrefabOptions.ConnectToPrefab);
         Object.DestroyImmediate(tempGo);
 
