@@ -20,6 +20,7 @@ public class GPUSkinBaker : EditorWindow
     public Shader playShader;
     public GameObject prefab;
     public AnimationClip[] animationClips;
+    public float[] clipFps;
     public string outputFolder;
 
     [MenuItem("Window/AnimationBaker")]
@@ -37,13 +38,17 @@ public class GPUSkinBaker : EditorWindow
         prefab = (GameObject)EditorGUILayout.ObjectField(prefab, typeof(GameObject), true);
         if (EditorGUI.EndChangeCheck())
             Setup(prefab);
+
         EditorGUILayout.Space();
         if (prefab != null)
         {
             for (var i = 0; i < animationClips.Length; i++)
             {
                 var animationClip = animationClips[i];
-                EditorGUILayout.LabelField(i + "." + animationClip.name);
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField(i + "." + animationClip.name + " defaultFps:" + animationClip.frameRate);
+                clipFps[i] = EditorGUILayout.FloatField(clipFps[i]);
+                EditorGUILayout.EndHorizontal();
             }
         }
         EditorGUILayout.LabelField(outputFolder);
@@ -58,7 +63,7 @@ public class GPUSkinBaker : EditorWindow
         EditorGUI.BeginDisabledGroup(prefab == null);
         if (GUILayout.Button("Bake", GUILayout.Height(50f)))
         {
-            Bake(outputFolder, prefab, infoTexGen, playShader, animationClips);
+            Bake(outputFolder, prefab, infoTexGen, playShader, animationClips, clipFps);
         }
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
@@ -72,15 +77,21 @@ public class GPUSkinBaker : EditorWindow
             var animator = go.GetComponent<Animator>();
             var clipSet = new HashSet<AnimationClip>(animator.runtimeAnimatorController.animationClips);
             animationClips = clipSet.ToArray();
+            clipFps = new float[animationClips.Length];
+            for (var i = 0; i < animationClips.Length; i++)
+            {
+                clipFps[i] = animationClips[i].frameRate;
+            }
+
             string animatorPath = AssetDatabase.GetAssetPath(animator.runtimeAnimatorController);
             string roleResPath = Path.GetDirectoryName(animatorPath);
             outputFolder = Path.Combine(roleResPath, "SkinBaked");
         }
     }
 
-    public static int GetAnimationClipFrames(AnimationClip clip)
+    public static int GetAnimationClipFrames(AnimationClip clip, float fps)
     {
-        int frame = (int)(clip.length * clip.frameRate);
+        int frame = (int)(clip.length * fps);
         //var bindings = AnimationUtility.GetCurveBindings(clip);
         //AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, bindings[0]);
         //frame = Mathf.Max(frame, curve.keys.Length - 1);
@@ -194,7 +205,7 @@ public class GPUSkinBaker : EditorWindow
         return key;
     }
 
-    public static void Bake(string outputFolder, GameObject go, ComputeShader infoTexGen, Shader playerShader, AnimationClip[] allClips)
+    public static void Bake(string outputFolder, GameObject go, ComputeShader infoTexGen, Shader playerShader, AnimationClip[] allClips, float[] customFPS)
     {
         if (!AssetDatabase.IsValidFolder(outputFolder))
             Directory.CreateDirectory(outputFolder);
@@ -229,13 +240,14 @@ public class GPUSkinBaker : EditorWindow
         for (var index = 0; index < allClips.Length; index++)
         {
             AnimationClip clip = allClips[index];
+            float fps = customFPS[index];
             //初始化配件Clip相关数据
             AnimationClip attachmentClip = null;
             List<AnimationCurve[]> attachmentCurves = null;
             if (attachments.Count > 0)
             {
                 attachmentClip = new AnimationClip();
-                attachmentClip.frameRate = clip.frameRate;
+                attachmentClip.frameRate = fps;
                 attachmentClip.name = clip.name;
                 var originClipSetting = AnimationUtility.GetAnimationClipSettings(clip);
                 var newClipSetting = AnimationUtility.GetAnimationClipSettings(attachmentClip);
@@ -255,11 +267,9 @@ public class GPUSkinBaker : EditorWindow
                 }
             }
 
-            //var fps = 1 / 20f;
             //var frames = Mathf.NextPowerOfTwo((int)(clip.length / fps));
-            var frames = GetAnimationClipFrames(clip);
-            float fps = 1 / clip.frameRate;
-            var texHeight = frames + 1;
+            var frames = GetAnimationClipFrames(clip, fps);
+            var texHeight = frames;
             atlasHeight += texHeight;
             var infoList = new List<VertInfo>();
 
@@ -277,7 +287,7 @@ public class GPUSkinBaker : EditorWindow
 
             for (var i = 0; i < texHeight; i++)
             {
-                float time = i * fps;
+                float time = i * (1 / fps);
                 AnimationMode.SampleAnimationClip(go, clip, time);
                 skinRender.BakeMesh(mesh);
 
@@ -385,7 +395,7 @@ public class GPUSkinBaker : EditorWindow
             clipData.name = clip.name;
             clipData.length = clip.length;
             clipData.frames = frames;
-            clipData.fps = clip.frameRate;
+            clipData.fps = customFPS[i];
             clipData.startV = (float)srcY / (float)(atlasPosTex.height + paddingOffset - 1);
             clipData.endV = (float)(srcY + frames) / (float)atlasPosTex.height;
             var clipSetting = AnimationUtility.GetAnimationClipSettings(clip);
