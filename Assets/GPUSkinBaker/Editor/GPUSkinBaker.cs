@@ -406,18 +406,19 @@ public class GPUSkinBaker : EditorWindow
 
         BakeMeshIndex(skinRender.sharedMesh, atlasWidth);
 
+        atlasPosTex = CreateOrReplaceAsset(atlasPosTex, Path.Combine(outputFolder, meshName + "_pos.asset"));
+        atlasNormalTex = CreateOrReplaceAsset(atlasNormalTex, Path.Combine(outputFolder, meshName + "_n.asset"));
+
         var mat = new Material(skinRender.sharedMaterial);
         mat.shader = playerShader;
         mat.SetTexture("_PosTex", atlasPosTex);
         mat.SetTexture("_BakeNmlTex", atlasNormalTex);
         mat.enableInstancing = true;
+        mat = CreateOrReplaceAsset(mat, Path.Combine(outputFolder, string.Format("{0}_gskin.mat", meshName)));
 
         animData.material = mat;
         animData.mesh = skinRender.sharedMesh;
-
-        AssetDatabase.CreateAsset(atlasPosTex, Path.Combine(outputFolder, meshName + "_pos.asset"));
-        AssetDatabase.CreateAsset(atlasNormalTex, Path.Combine(outputFolder, meshName + "_n.asset"));
-        AssetDatabase.CreateAsset(animData, Path.Combine(outputFolder, meshName + "_animData.asset"));
+        animData = CreateOrReplaceAsset(animData, Path.Combine(outputFolder, meshName + "_animData.asset"));
 
         var newAnimatorController = GenGPUSkinOverrideController(Path.Combine(outputFolder, go.name + "_gskin.overrideController"), baseController, overrideClips);
 
@@ -436,7 +437,6 @@ public class GPUSkinBaker : EditorWindow
             }
         }
 
-        AssetDatabase.CreateAsset(mat, Path.Combine(outputFolder, string.Format("{0}_gskin.mat", meshName)));
         PrefabUtility.CreatePrefab(Path.Combine(RawPrefabsPath, tempGo.name + ".prefab").Replace("\\", "/"), tempGo, ReplacePrefabOptions.ConnectToPrefab);
         Object.DestroyImmediate(tempGo);
 
@@ -444,6 +444,23 @@ public class GPUSkinBaker : EditorWindow
         AssetDatabase.Refresh();
 
         Debug.Log("Bake GPUSkin Finish:" + animData.name, animData);
+    }
+
+    public static T CreateOrReplaceAsset<T>(T asset, string path) where T : Object
+    {
+        T existingAsset = AssetDatabase.LoadAssetAtPath<T>(path);
+
+        if (existingAsset == null)
+        {
+            AssetDatabase.CreateAsset(asset, path);
+            existingAsset = asset;
+        }
+        else
+        {
+            EditorUtility.CopySerialized(asset, existingAsset);
+        }
+
+        return existingAsset;
     }
 
     private static void BakeMeshIndex(Mesh mesh, float texWidth)
